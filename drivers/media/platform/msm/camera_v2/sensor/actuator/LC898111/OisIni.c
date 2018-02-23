@@ -16,7 +16,9 @@
 #include	"OisFil.h"
 #include	"OisDef.h"
 
+/* HTC_START 20130329 */
 #include	"HtcActOisBinder.h"
+/* HTC_END */
 
 
 //**************************
@@ -32,6 +34,7 @@ void	IniGfl( void ) ;		// Gyro Filter Initial Parameter Setting
 void	IniAdj( void ) ;		// Adjust Fix Value Setting
 void	IniCmd( void ) ;		// Command Execute Process Initial
 void	IniDgy( void ) ;		// Digital Gyro Initial Setting
+
 
 
 //********************************************************************************
@@ -1034,6 +1037,7 @@ void	IniAdj( void )
 }
 
 
+
 //********************************************************************************
 // Function Name 	: IniCmd
 // Retun Value		: NON
@@ -1112,6 +1116,8 @@ void	MemClr( unsigned char	*NcTgtPtr, unsigned short	UsClrSiz )
 	}
 }
 
+
+//HTC_START  20130329 removed
 #if 0
 //********************************************************************************
 // Function Name 	: WitTim
@@ -1132,6 +1138,7 @@ void	WitTim( unsigned short	UsWitTim )
 	}
 }
 #endif
+//HTC_END
 
 //********************************************************************************
 // Function Name 	: GyOutSignal

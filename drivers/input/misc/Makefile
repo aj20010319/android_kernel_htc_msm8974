@@ -70,3 +70,7 @@ obj-$(CONFIG_AK8789_HALLSENSOR)		+= hall_sensor.o
 obj-$(CONFIG_INPUT_CWSTM32)		+= CwMcuSensor.o
 obj-$(CONFIG_SENSORS_CAPELLA_CM32181)	+= cm32181.o
 obj-$(CONFIG_SENSORS_CAPELLA_CM36283)	+= cm36283.o
+ifeq ($(CONFIG_SENSORS_CAPELLA_CM3629),y)
+proximity-objs := cm3629.o
+obj-$(CONFIG_SENSORS_CAPELLA_CM3629)      += proximity.o
+endif

@@ -16,7 +16,6 @@
 #include "msm_camera_i2c_mux.h"
 #include "msm_cci.h"
 
-/*#define CONFIG_MSM_CAMERA_DT_DEBUG*/
 #undef CDBG
 #ifdef CONFIG_MSM_CAMERA_DT_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
@@ -31,14 +30,14 @@ int msm_camera_fill_vreg_params(struct camera_vreg_t *cam_vreg,
 	uint16_t i = 0;
 	int      j = 0;
 
-	/* Validate input parameters */
+	
 	if (!cam_vreg || !power_setting) {
 		pr_err("%s:%d failed: cam_vreg %p power_setting %p", __func__,
 			__LINE__,  cam_vreg, power_setting);
 		return -EINVAL;
 	}
 
-	/* Validate size of num_vreg */
+	
 	if (num_vreg <= 0) {
 		pr_err("failed: num_vreg %d", num_vreg);
 		return -EINVAL;
@@ -678,8 +677,10 @@ int msm_camera_get_dt_gpio_set_tbl(struct device_node *of_node,
 		if (val_array[i] >= gpio_array_size) {
 			pr_err("%s gpio set tbl index %d invalid\n",
 				__func__, val_array[i]);
-			rc = -EINVAL;
-			goto ERROR2;
+			
+			kfree(val_array);
+			
+			return -EINVAL;
 		}
 		gconf->cam_gpio_set_tbl[i].gpio = gpio_array[val_array[i]];
 		CDBG("%s cam_gpio_set_tbl[%d].gpio = %d\n", __func__, i,
@@ -735,6 +736,24 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		return rc;
 	}
 
+	if (of_property_read_bool(of_node, "qcom,gpio-vdig") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-vdig", &val);
+		if (rc < 0) {
+			pr_err("%s:%d read qcom,gpio-reset failed rc %d\n",
+				__func__, __LINE__, rc);
+			goto ERROR;
+		} else if (val >= gpio_array_size) {
+			pr_err("%s:%d qcom,gpio-reset invalid %d\n",
+				__func__, __LINE__, val);
+			goto ERROR;
+		}
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VDIG] =
+			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_VDIG] = 1;
+		CDBG("%s qcom,gpio-reset %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VDIG]);
+	}
+
 	if (of_property_read_bool(of_node, "qcom,gpio-reset") == true) {
 		rc = of_property_read_u32(of_node, "qcom,gpio-reset", &val);
 		if (rc < 0) {
@@ -748,6 +767,7 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET] =
 			gpio_array[val];
+		gconf->gpio_num_info->valid[SENSOR_GPIO_RESET] = 1;
 		CDBG("%s qcom,gpio-reset %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_RESET]);
 	}
@@ -765,130 +785,48 @@ int msm_camera_init_gpio_pin_tbl(struct device_node *of_node,
 		}
 		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY] =
 			gpio_array[val];
-		CDBG("%s qcom,gpio-standby %d\n", __func__,
+		gconf->gpio_num_info->valid[SENSOR_GPIO_STANDBY] = 1;
+		CDBG("%s qcom,gpio-reset %d\n", __func__,
 			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_STANDBY]);
 	}
 
-	rc = of_property_read_u32(of_node, "qcom,gpio-vio", &val);
-	if (!rc) {
-		if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-vio invalid %d\n",
-				__func__, __LINE__, val);
-			goto ERROR;
-		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VIO] =
-			gpio_array[val];
-		CDBG("%s qcom,gpio-vio %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VIO]);
-	} else if (rc != -EINVAL) {
-		pr_err("%s:%d read qcom,gpio-vio failed rc %d\n",
-			__func__, __LINE__, rc);
-		goto ERROR;
-	}
-
-	rc = of_property_read_u32(of_node, "qcom,gpio-vana", &val);
-	if (!rc) {
-		if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-vana invalid %d\n",
-				__func__, __LINE__, val);
-			goto ERROR;
-		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VANA] =
-			gpio_array[val];
-		CDBG("%s qcom,gpio-vana %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VANA]);
-	} else if (rc != -EINVAL) {
-		pr_err("%s:%d read qcom,gpio-vana failed rc %d\n",
-			__func__, __LINE__, rc);
-		goto ERROR;
-	}
-
-	rc = of_property_read_u32(of_node, "qcom,gpio-vdig", &val);
-	if (!rc) {
-		if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-vdig invalid %d\n",
-				__func__, __LINE__, val);
-			goto ERROR;
-		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VDIG] =
-			gpio_array[val];
-		CDBG("%s qcom,gpio-vdig %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VDIG]);
-	} else if (rc != -EINVAL) {
-		pr_err("%s:%d read qcom,gpio-vdig failed rc %d\n",
-			__func__, __LINE__, rc);
-		goto ERROR;
-	}
-
-	rc = of_property_read_u32(of_node, "qcom,gpio-vaf", &val);
-	if (!rc) {
-		if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-vaf invalid %d\n",
-				__func__, __LINE__, val);
-			goto ERROR;
-		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VAF] =
-			gpio_array[val];
-		CDBG("%s qcom,gpio-vaf %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VAF]);
-	} else if (rc != -EINVAL) {
-		pr_err("%s:%d read qcom,gpio-vaf failed rc %d\n",
-			__func__, __LINE__, rc);
-		goto ERROR;
-	}
-
-	rc = of_property_read_u32(of_node, "qcom,gpio-af-pwdm", &val);
-	if (!rc) {
-		if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-af-pwdm invalid %d\n",
-				__func__, __LINE__, val);
-			goto ERROR;
-		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_AF_PWDM] =
-			gpio_array[val];
-		CDBG("%s qcom,gpio-af-pwdm %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_AF_PWDM]);
-	} else if (rc != -EINVAL) {
-		pr_err("%s:%d read qcom,gpio-af-pwdm failed rc %d\n",
-			__func__, __LINE__, rc);
-		goto ERROR;
-	}
-
-	if (of_property_read_bool(of_node, "qcom,gpio-vcm-pwd") == true) {
-		rc = of_property_read_u32(of_node, "qcom,gpio-vcm-pwd", &val);
+	if (of_property_read_bool(of_node, "qcom,gpio-flash-en") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-flash-en", &val);
 		if (rc < 0) {
-			pr_err("%s:%d read qcom,gpio-vcm-pwd failed rc %d\n",
+			pr_err("%s:%d read qcom,gpio-flash-en failed rc %d\n",
 				__func__, __LINE__, rc);
 			goto ERROR;
 		} else if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-vcm-pwd invalid %d\n",
+			pr_err("%s:%d qcom,gpio-flash-en invalid %d\n",
 				__func__, __LINE__, val);
 			goto ERROR;
 		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VCM_PWD] =
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_FL_EN] =
 			gpio_array[val];
-		CDBG("%s qcom,gpio-vcm-pwd %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_VCM_PWD]);
+		gconf->gpio_num_info->valid[SENSOR_GPIO_FL_EN] = 1;
+		CDBG("%s qcom,gpio-flash-en %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_FL_EN]);
 	}
 
-	if (of_property_read_bool(of_node, "htc,gpio-camid") == true) {
-		rc = of_property_read_u32(of_node, "htc,gpio-camid", &val);
+	if (of_property_read_bool(of_node, "qcom,gpio-flash-now") == true) {
+		rc = of_property_read_u32(of_node, "qcom,gpio-flash-now", &val);
 		if (rc < 0) {
-			pr_err("%s:%d read qcom,gpio-camid failed rc %d\n",
+			pr_err("%s:%d read qcom,gpio-flash-now failed rc %d\n",
 				__func__, __LINE__, rc);
 			goto ERROR;
 		} else if (val >= gpio_array_size) {
-			pr_err("%s:%d qcom,gpio-camid invalid %d\n",
+			pr_err("%s:%d qcom,gpio-flash-now invalid %d\n",
 				__func__, __LINE__, val);
 			goto ERROR;
 		}
-		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAMID] =
+		gconf->gpio_num_info->gpio_num[SENSOR_GPIO_FL_NOW] =
 			gpio_array[val];
-		gconf->gpio_num_info->valid[SENSOR_GPIO_CAMID] = 1;
-		CDBG("%s qcom,gpio-cam-id %d\n", __func__,
-			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_CAMID]);
+		gconf->gpio_num_info->valid[SENSOR_GPIO_FL_NOW] = 1;
+		CDBG("%s qcom,gpio-flash-now %d\n", __func__,
+			gconf->gpio_num_info->gpio_num[SENSOR_GPIO_FL_NOW]);
 	}
-	return 0;
+
+	return rc;
 
 ERROR:
 	kfree(gconf->gpio_num_info);
@@ -984,20 +922,6 @@ int msm_camera_get_dt_vreg_data(struct device_node *of_node,
 			vreg[i].op_mode);
 	}
 
-#ifndef CONFIG_MACH_A11_UL
-	rc = of_property_read_u32_array(of_node, "qcom,cam-vreg-gpios-index",
-		vreg_array, count);
-	if (rc < 0) {
-		pr_err("%s failed %d\n", __func__, __LINE__);
-		goto ERROR2;
-	}
-	for (i = 0; i < count; i++) {
-		vreg[i].gpios_index = vreg_array[i];
-		CDBG("%s cam_vreg[%d].gpios_index = %d\n", __func__, i,
-			vreg[i].gpios_index);
-	}
-#endif
-
 	kfree(vreg_array);
 	return rc;
 ERROR2:
@@ -1005,74 +929,6 @@ ERROR2:
 ERROR1:
 	kfree(vreg);
 	*num_vreg = 0;
-	return rc;
-}
-
-int msm_camera_get_dt_ncp6924_vreg_data(struct device_node *of_node,
-	struct msm_camera_sensor_board_info *sensordata)
-{
-	int rc = 0, i = 0;
-	uint32_t count = 0;
-	uint32_t *vreg_array = NULL;
-
-	count = of_property_count_strings(of_node, "htc,ncp6924-vreg-name");
-	CDBG("%s htc,ncp6924-vreg-name count %d\n", __func__, count);
-
-	if (!count)
-		return 0;
-
-	sensordata->cam_ncp6924_vreg = kzalloc(sizeof(struct camera_ncp6924_vreg_t) * count,
-		GFP_KERNEL);
-	if (!sensordata->cam_ncp6924_vreg) {
-		pr_err("%s failed %d\n", __func__, __LINE__);
-		return -ENOMEM;
-	}
-
-	sensordata->num_vreg = count;
-	for (i = 0; i < count; i++) {
-		rc = of_property_read_string_index(of_node,
-			"htc,ncp6924-vreg-name", i,
-			&sensordata->cam_ncp6924_vreg[i].reg_name);
-		CDBG("%s reg_name[%d] = %s\n", __func__, i,
-			sensordata->cam_ncp6924_vreg[i].reg_name);
-		if (rc < 0) {
-			pr_err("%s failed %d\n", __func__, __LINE__);
-			goto ERROR1;
-		}
-	}
-
-	vreg_array = kzalloc(sizeof(uint32_t) * count, GFP_KERNEL);
-	rc = of_property_read_u32_array(of_node, "htc,ncp6924-vreg-min-voltage",
-		vreg_array, count);
-	if (rc < 0) {
-		pr_err("%s failed %d\n", __func__, __LINE__);
-		goto ERROR2;
-	}
-	for (i = 0; i < count; i++) {
-		sensordata->cam_ncp6924_vreg[i].min_voltage = vreg_array[i];
-		CDBG("%s cam_ncp6924_vreg[%d].min_voltage = %d\n", __func__,
-			i, sensordata->cam_ncp6924_vreg[i].min_voltage);
-	}
-
-	rc = of_property_read_u32_array(of_node, "htc,ncp6924-vreg-max-voltage",
-		vreg_array, count);
-	if (rc < 0) {
-		pr_err("%s failed %d\n", __func__, __LINE__);
-		goto ERROR2;
-	}
-	for (i = 0; i < count; i++) {
-		sensordata->cam_ncp6924_vreg[i].max_voltage = vreg_array[i];
-		CDBG("%s cam_ncp6924_vreg[%d].max_voltage = %d\n", __func__,
-			i, sensordata->cam_ncp6924_vreg[i].max_voltage);
-	}
-
-	kfree(vreg_array);
-	return rc;
-ERROR2:
-	kfree(vreg_array);
-ERROR1:
-	kfree(sensordata->cam_ncp6924_vreg);
-	sensordata->num_vreg = 0;
 	return rc;
 }
 
@@ -1229,6 +1085,13 @@ power_up_failed:
 				0);
 			break;
 		case SENSOR_GPIO:
+			
+			if (ctrl->gpio_conf->gpio_num_info == NULL) {
+				pr_err("%s ctrl->gpio_conf->gpio_num_info is NULL\n", __func__);
+				break;
+			}
+			
+
 			if (!ctrl->gpio_conf->gpio_num_info->valid
 				[power_setting->seq_val])
 				continue;

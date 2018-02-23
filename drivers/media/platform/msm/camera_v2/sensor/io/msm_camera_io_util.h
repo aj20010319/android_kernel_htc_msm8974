@@ -55,9 +55,6 @@ void msm_camera_config_single_gpio(uint16_t gpio, unsigned long flags,
 int msm_camera_config_single_vreg(struct device *dev,
 	struct camera_vreg_t *cam_vreg, struct regulator **reg_ptr, int config);
 
-int msm_camera_config_single_ncp6924_vreg(struct device *dev,
-	struct camera_ncp6924_vreg_t *ncp6924_vreg, struct regulator **reg_ptr, int config);
-
 int msm_camera_request_gpio_table(struct gpio *gpio_tbl, uint8_t size,
 	int gpio_en);
 

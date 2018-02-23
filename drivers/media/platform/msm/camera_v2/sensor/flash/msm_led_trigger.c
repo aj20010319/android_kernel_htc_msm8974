@@ -15,12 +15,11 @@
 
 #include <linux/module.h>
 #include <linux/htc_flashlight.h>
-#include <mach/devices_cmdline.h>
 #include "msm_led_flash.h"
+#include <mach/devices_cmdline.h>
 
 #define FLASH_NAME "camera-led-flash"
 
-/*#define CONFIG_MSMB_CAMERA_DEBUG*/
 #undef CDBG
 #ifdef CONFIG_MSMB_CAMERA_DEBUG
 #define CDBG(fmt, args...) pr_err(fmt, ##args)
@@ -34,7 +33,9 @@ extern int32_t msm_led_torch_create_classdev(
 static enum flash_type flashtype;
 static struct msm_led_flash_ctrl_t fctrl;
 
-static struct kobject *led_status_obj;
+#if 1 
+static struct kobject *led_status_obj; 
+#endif 
 
 static int32_t msm_led_trigger_get_subdev_id(struct msm_led_flash_ctrl_t *fctrl,
 	void *arg)
@@ -54,102 +55,63 @@ static int32_t msm_led_trigger_config(struct msm_led_flash_ctrl_t *fctrl,
 {
 	int rc = 0;
 	struct msm_camera_led_cfg_t *cfg = (struct msm_camera_led_cfg_t *)data;
-#ifndef CONFIG_FLASHLIGHT_TPS61310
-	uint32_t i;
-	uint32_t curr_l, max_curr_l;
-#endif
-	CDBG("called led_state %d\n", cfg->cfgtype);
+	pr_info("[CAM][FL] called led_state %d\n", cfg->cfgtype);
 
-	if (!fctrl) {
+	if (!fctrl->led_trigger[0]) {
 		pr_err("failed\n");
 		return -EINVAL;
 	}
-
 	switch (cfg->cfgtype) {
 	case MSM_CAMERA_LED_OFF:
-#ifndef CONFIG_FLASHLIGHT_TPS61310
-		for (i = 0; i < fctrl->num_sources; i++)
-			if (fctrl->flash_trigger[i])
-				led_trigger_event(fctrl->flash_trigger[i], 0);
-		if (fctrl->torch_trigger)
-			led_trigger_event(fctrl->torch_trigger, 0);
-#else
-		tps61310_flashlight_control(FL_MODE_OFF);
-#endif
-		break;
+        #ifndef CONFIG_FLASHLIGHT_TPS61310 
+        led_trigger_event(fctrl->led_trigger[0], 0);
+        #else
+        tps61310_flashlight_control(FL_MODE_OFF);
+        #endif 
+        break;
 
 	case MSM_CAMERA_LED_LOW:
-#ifndef CONFIG_FLASHLIGHT_TPS61310
-		if (fctrl->torch_trigger) {
-			max_curr_l = fctrl->torch_max_current;
-			if (cfg->torch_current > 0 &&
-					cfg->torch_current < max_curr_l) {
-				curr_l = cfg->torch_current;
-			} else {
-				curr_l = fctrl->torch_op_current;
-				pr_err("LED current clamped to %d\n",
-					curr_l);
-			}
-			led_trigger_event(fctrl->torch_trigger,
-				curr_l);
-		}
-#else
-		tps61310_flashlight_control(FL_MODE_PRE_FLASH);
-#endif
-		break;
+        #ifndef CONFIG_FLASHLIGHT_TPS61310 
+        led_trigger_event(fctrl->led_trigger[0], fctrl->op_current[0] / 2);
+        #else
+        tps61310_flashlight_control(FL_MODE_PRE_FLASH);
+        #endif 
+        break;
 
 	case MSM_CAMERA_LED_HIGH:
-#ifndef CONFIG_FLASHLIGHT_TPS61310
-		if (fctrl->torch_trigger)
-			led_trigger_event(fctrl->torch_trigger, 0);
-		for (i = 0; i < fctrl->num_sources; i++)
-			if (fctrl->flash_trigger[i]) {
-				max_curr_l = fctrl->flash_max_current[i];
-				if (cfg->flash_current[i] > 0 &&
-						cfg->flash_current[i] < max_curr_l) {
-					curr_l = cfg->flash_current[i];
-				} else {
-					curr_l = fctrl->flash_op_current[i];
-					pr_err("LED current clamped to %d\n",
-						curr_l);
-				}
-				led_trigger_event(fctrl->flash_trigger[i],
-					curr_l);
-			}
-#else
-		CDBG("called linear flashlight current value %d", (int)cfg->ma_value);
-		if (cfg->ma_value == 0)
-			tps61310_flashlight_control(FL_MODE_FLASH_LEVEL7);
-		else {
-			int led1 = (int)cfg->ma_value & 0xFFFF;
-			int led2 = (cfg->ma_value & 0xFFFF0000)>>16;
-			CDBG("led1[%d]led2[%d]", led1, led2);
-			if (led1 == 1500 && led2 == 0)
-				tps61310_flashlight_mode(led1);
-			else
-				tps61310_flashlight_mode2(led1, led2);
-		}
-#endif
-		break;
+        #ifndef CONFIG_FLASHLIGHT_TPS61310 
+        led_trigger_event(fctrl->led_trigger[0], fctrl->op_current[0]);
+        #else
+        pr_info("[CAM][FL] called linear flashlight current value %d", (int)cfg->ma_value);
+        if (cfg->ma_value == 0)
+          tps61310_flashlight_control(FL_MODE_FLASH_LEVEL7);
+        else{
+          int led1 = (int)cfg->ma_value & 0xFFFF;
+          int led2 = (cfg->ma_value & 0xFFFF0000)>>16;
+          pr_info("[CAM][FL] led1[%d]led2[%d]", led1, led2);
+          if(led1 == 1500 && led2 == 0){
+              tps61310_flashlight_mode(led1);
+          }else{
+              tps61310_flashlight_mode2(led1, led2);
+          }
+        }
+        #endif 
+        break;
 
 	case MSM_CAMERA_LED_INIT:
 	case MSM_CAMERA_LED_RELEASE:
-#ifndef CONFIG_FLASHLIGHT_TPS61310
-		for (i = 0; i < fctrl->num_sources; i++)
-			if (fctrl->flash_trigger[i])
-				led_trigger_event(fctrl->flash_trigger[i], 0);
-		if (fctrl->torch_trigger)
-			led_trigger_event(fctrl->torch_trigger, 0);
-#else
-		tps61310_flashlight_control(FL_MODE_OFF);
-#endif
-		break;
+        #ifndef CONFIG_FLASHLIGHT_TPS61310 
+        led_trigger_event(fctrl->led_trigger[0], 0);
+        #else
+        tps61310_flashlight_control(FL_MODE_OFF);
+        #endif 
+        break;
 
 	default:
 		rc = -EFAULT;
 		break;
 	}
-	CDBG("flash_set_led_state: return %d\n", rc);
+	pr_info("[CAM][FL] flash_set_led_state: return %d\n", rc);
 	return rc;
 }
 
@@ -176,7 +138,7 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 	uint32_t count = 0;
 	struct led_trigger *temp = NULL;
 
-	CDBG("called\n");
+	pr_info("[CAM][FL] called\n");
 
 	if (!of_node) {
 		pr_err("of_node NULL\n");
@@ -184,14 +146,13 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 	}
 
 	fctrl.pdev = pdev;
-	fctrl.num_sources = 0;
 
 	rc = of_property_read_u32(of_node, "cell-index", &pdev->id);
 	if (rc < 0) {
 		pr_err("failed\n");
 		return -EINVAL;
 	}
-	CDBG("pdev id %d\n", pdev->id);
+	pr_info("[CAM][FL] pdev id %d\n", pdev->id);
 
 	rc = of_property_read_u32(of_node,
 			"qcom,flash-type", &flashtype);
@@ -202,12 +163,11 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 
 	if (of_get_property(of_node, "qcom,flash-source", &count)) {
 		count /= sizeof(uint32_t);
-		CDBG("count %d\n", count);
+		pr_info("[CAM][FL] count %d\n", count);
 		if (count > MAX_LED_TRIGGERS) {
 			pr_err("invalid count\n");
 			return -EINVAL;
 		}
-		fctrl.num_sources = count;
 		for (i = 0; i < count; i++) {
 			flash_src_node = of_parse_phandle(of_node,
 				"qcom,flash-source", i);
@@ -218,26 +178,25 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 
 			rc = of_property_read_string(flash_src_node,
 				"linux,default-trigger",
-				&fctrl.flash_trigger_name[i]);
+				&fctrl.led_trigger_name[i]);
 			if (rc < 0) {
 				pr_err("default-trigger: read failed\n");
 				of_node_put(flash_src_node);
 				continue;
 			}
 
-			CDBG("default trigger %s\n",
-				fctrl.flash_trigger_name[i]);
+			pr_info("default trigger %s\n", fctrl.led_trigger_name[i]);
 
 			if (flashtype == GPIO_FLASH) {
-				/* use fake current */
-				fctrl.flash_op_current[i] = LED_FULL;
+				
+				fctrl.op_current[i] = LED_FULL;
 			} else {
 				rc = of_property_read_u32(flash_src_node,
 					"qcom,current",
-					&fctrl.flash_op_current[i]);
+					&fctrl.op_current[i]);
 				rc_1 = of_property_read_u32(flash_src_node,
 					"qcom,max-current",
-					&fctrl.flash_max_current[i]);
+					&fctrl.max_current[i]);
 				if ((rc < 0) || (rc_1 < 0)) {
 					pr_err("current: read failed\n");
 					of_node_put(flash_src_node);
@@ -247,18 +206,17 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 
 			of_node_put(flash_src_node);
 
-			CDBG("max_current[%d] %d\n",
-				i, fctrl.flash_op_current[i]);
+			pr_info("[CAM][FL] max_current[%d] %d\n", i, fctrl.op_current[i]);
 
-			led_trigger_register_simple(fctrl.flash_trigger_name[i],
-				&fctrl.flash_trigger[i]);
+			led_trigger_register_simple(fctrl.led_trigger_name[i],
+				&fctrl.led_trigger[i]);
 
 			if (flashtype == GPIO_FLASH)
-				if (fctrl.flash_trigger[i])
-					temp = fctrl.flash_trigger[i];
+				if (fctrl.led_trigger[i])
+					temp = fctrl.led_trigger[i];
 		}
 
-		/* Torch source */
+		
 		flash_src_node = of_parse_phandle(of_node, "qcom,torch-source",
 			0);
 		if (flash_src_node) {
@@ -274,7 +232,7 @@ static int32_t msm_led_trigger_probe(struct platform_device *pdev)
 				fctrl.torch_trigger_name);
 
 			if (flashtype == GPIO_FLASH) {
-				/* use fake current */
+				
 				fctrl.torch_op_current = LED_FULL;
 				if (temp)
 					fctrl.torch_trigger = temp;
@@ -314,6 +272,8 @@ torch_failed:
 	return rc;
 }
 
+#if 1 
+
 static uint32_t led_ril_status_value;
 static uint32_t led_wimax_status_value;
 static uint32_t led_hotspot_status_value;
@@ -339,7 +299,7 @@ static ssize_t led_ril_status_set(struct device *dev,
 		tmp = buf[0] - 0x30;
 
 	led_ril_status_value = tmp;
-	CDBG("led_ril_status_value = %d\n", led_ril_status_value);
+	pr_info("[CAM][FL] led_ril_status_value = %d\n", led_ril_status_value);
 	return count;
 }
 
@@ -361,7 +321,7 @@ static ssize_t led_wimax_status_set(struct device *dev,
 		tmp = buf[0] - 0x30;
 
 	led_wimax_status_value = tmp;
-	CDBG("led_wimax_status_value = %d\n", led_wimax_status_value);
+	pr_info("[CAM][FL] led_wimax_status_value = %d\n", led_wimax_status_value);
 	return count;
 }
 
@@ -379,10 +339,10 @@ static ssize_t led_hotspot_status_set(struct device *dev,
 {
 	uint32_t tmp = 0;
 
-	tmp = buf[0] - 0x30;
+	tmp = buf[0] - 0x30; 
 
 	led_hotspot_status_value = tmp;
-	CDBG("led_hotspot_status_value = %d\n", led_hotspot_status_value);
+	pr_info("[CAM][FL] led_hotspot_status_value = %d\n", led_hotspot_status_value);
 	return count;
 }
 
@@ -441,9 +401,11 @@ static int __init msm_led_trigger_sysfs_init(void)
 {
 	int ret = 0;
 
+	pr_info("[CAM][FL] %s:%d\n", __func__, __LINE__);
+
 	led_status_obj = kobject_create_and_add("camera_led_status", NULL);
 	if (led_status_obj == NULL) {
-		CDBG("msm_camera_led: subsystem_register failed\n");
+		pr_info("[CAM][FL] msm_camera_led: subsystem_register failed\n");
 		ret = -ENOMEM;
 		goto error;
 	}
@@ -451,72 +413,81 @@ static int __init msm_led_trigger_sysfs_init(void)
 	ret = sysfs_create_file(led_status_obj,
 		&dev_attr_led_ril_status.attr);
 	if (ret) {
-		CDBG("msm_camera_led: sysfs_create_file dev_attr_led_ril_status failed\n");
+		pr_err("[CAM][FL] msm_camera_led: sysfs_create_file dev_attr_led_ril_status failed\n");
 		ret = -EFAULT;
 		goto error;
 	}
 	ret = sysfs_create_file(led_status_obj,
 		&dev_attr_led_wimax_status.attr);
 	if (ret) {
-		CDBG("msm_camera_led: sysfs_create_file dev_attr_led_wimax_status failed\n");
+		pr_err("[CAM][FL] msm_camera_led: sysfs_create_file dev_attr_led_wimax_status failed\n");
 		ret = -EFAULT;
 		goto error;
 	}
 	ret = sysfs_create_file(led_status_obj,
 		&dev_attr_led_hotspot_status.attr);
 	if (ret) {
-		CDBG("msm_camera_led: sysfs_create_file dev_attr_led_hotspot_status failed\n");
+		pr_err("[CAM][FL] msm_camera_led: sysfs_create_file dev_attr_led_hotspot_status failed\n");
 		ret = -EFAULT;
 		goto error;
 	}
 	ret = sysfs_create_file(led_status_obj,
 		&dev_attr_low_temp_limit.attr);
 	if (ret) {
-		CDBG("msm_camera_led: sysfs_create_file dev_attr_low_temp_limit failed\n");
+		pr_err("[CAM][FL] msm_camera_led: sysfs_create_file dev_attr_low_temp_limit failed\n");
 		ret = -EFAULT;
 		goto error;
 	}
 	ret = sysfs_create_file(led_status_obj,
 		&dev_attr_low_cap_limit.attr);
 	if (ret) {
-		CDBG("msm_camera_led: sysfs_create_file dev_attr_low_cap_limit failed\n");
+		pr_err("[CAM][FL] msm_camera_led: sysfs_create_file dev_attr_low_cap_limit failed\n");
 		ret = -EFAULT;
 		goto error;
 	}
 	ret = sysfs_create_file(led_status_obj,
 		&dev_attr_low_cap_limit_dual.attr);
 	if (ret) {
-		CDBG("msm_camera_led: sysfs_create_file dev_attr_low_cap_limit_dual failed\n");
+		pr_err("[CAM][FL] msm_camera_led: sysfs_create_file dev_attr_low_cap_limit_dual failed\n");
 		ret = -EFAULT;
 		goto error;
 	}
 
+	pr_info("[CAM][FL] %s:%d ret %d\n", __func__, __LINE__, ret);
 	return ret;
+
 error:
 	kobject_del(led_status_obj);
 	return ret;
+
 }
+#endif 
 
 static int __init msm_led_trigger_add_driver(void)
 {
-#if 0
+    #if 0 
+
 	CDBG("called\n");
 	return platform_driver_probe(&msm_led_trigger_driver,
 		msm_led_trigger_probe);
-#else
+
+    #else
+
 	int32_t rc = 0;
 	if (board_mfg_mode() == MFG_MODE_OFFMODE_CHARGING) {
-		CDBG("offmode_charging, skip probe\n");
+		pr_err("offmode_charging, skip probe\n");
 		return 0;
 	}
+	pr_info("%s:%d\n", __func__, __LINE__);
 	rc = platform_driver_probe(&msm_led_trigger_driver,
 		msm_led_trigger_probe);
 	if (!rc) {
 		rc = msm_led_trigger_sysfs_init();
 	}
-	CDBG("%s:%d rc %d\n", __func__, __LINE__, rc);
+	pr_err("%s:%d rc %d\n", __func__, __LINE__, rc);
 	return rc;
-#endif
+
+    #endif 
 }
 
 static struct msm_flash_fn_t msm_led_trigger_func_tbl = {

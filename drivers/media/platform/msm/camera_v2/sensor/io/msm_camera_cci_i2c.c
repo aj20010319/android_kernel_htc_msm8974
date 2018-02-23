@@ -1,4 +1,4 @@
-/* Copyright (c) 2011-2016, The Linux Foundation. All rights reserved.
+/* Copyright (c) 2011-2013, The Linux Foundation. All rights reserved.
  *
  * This program is free software; you can redistribute it and/or modify
  * it under the terms of the GNU General Public License version 2 and
@@ -70,20 +70,14 @@ int32_t msm_camera_cci_i2c_read_seq(struct msm_camera_i2c_client *client,
 	unsigned char *buf = NULL;
 	int i;
 	struct msm_camera_cci_ctrl cci_ctrl;
-
-	// HTC: add to fix Klocwork issue
+	/* HTC_START , add to fix Klocwork issue */
 	cci_ctrl.status = 0;
+	/* HTC_END */
 
 	if ((client->addr_type != MSM_CAMERA_I2C_BYTE_ADDR
 		&& client->addr_type != MSM_CAMERA_I2C_WORD_ADDR)
 		|| num_byte == 0)
 		return rc;
-
-	if (num_byte > I2C_REG_DATA_MAX) {
-		pr_err("%s: Error num_byte:0x%x exceeds 8K max supported:0x%x\n",
-			__func__, num_byte, I2C_REG_DATA_MAX);
-		return rc;
-	}
 
 	buf = kzalloc(num_byte, GFP_KERNEL);
 	if (!buf) {
@@ -151,36 +145,21 @@ int32_t msm_camera_cci_i2c_write_seq(struct msm_camera_i2c_client *client,
 	int32_t rc = -EFAULT;
 	uint8_t i = 0;
 	struct msm_camera_cci_ctrl cci_ctrl;
-	struct msm_camera_i2c_reg_array *reg_conf_tbl = NULL;
-
-	// HTC: add to fix Klocwork issue
+	struct msm_camera_i2c_reg_array reg_conf_tbl[num_byte];
+	/* HTC_START , add to fix Klocwork issue */
 	cci_ctrl.status = 0;
+	/* HTC_END */
 
 	if ((client->addr_type != MSM_CAMERA_I2C_BYTE_ADDR
 		&& client->addr_type != MSM_CAMERA_I2C_WORD_ADDR)
 		|| num_byte == 0)
 		return rc;
-	if (num_byte > I2C_SEQ_REG_DATA_MAX) {
-		pr_err("%s: num_byte=%d clamped to max supported %d\n",
-			__func__, num_byte, I2C_SEQ_REG_DATA_MAX);
-		return rc;
-	}
 
 	S_I2C_DBG("%s reg addr = 0x%x num bytes: %d\n",
-		__func__, addr, num_byte);
-
-	reg_conf_tbl = kzalloc(num_byte *
-		(sizeof(struct msm_camera_i2c_reg_array)), GFP_KERNEL);
-	if (!reg_conf_tbl) {
-		pr_err("%s:%d no memory\n", __func__, __LINE__);
-		return -ENOMEM;
-	}
+			  __func__, addr, num_byte);
+	memset(reg_conf_tbl, 0,
+		num_byte * sizeof(struct msm_camera_i2c_reg_array));
 	reg_conf_tbl[0].reg_addr = addr;
-	if (num_byte > I2C_SEQ_REG_DATA_MAX) {
-		pr_err("%s: num_byte=%d clamped to max supported %d\n",
-			__func__, num_byte, I2C_SEQ_REG_DATA_MAX);
-		num_byte = I2C_SEQ_REG_DATA_MAX;
-	}
 	for (i = 0; i < num_byte; i++) {
 		reg_conf_tbl[i].reg_data = data[i];
 		reg_conf_tbl[i].delay = 0;
@@ -195,40 +174,45 @@ int32_t msm_camera_cci_i2c_write_seq(struct msm_camera_i2c_client *client,
 			core, ioctl, VIDIOC_MSM_CCI_CFG, &cci_ctrl);
 	CDBG("%s line %d rc = %d\n", __func__, __LINE__, rc);
 	rc = cci_ctrl.status;
-	kfree(reg_conf_tbl);
-	reg_conf_tbl = NULL;
 	return rc;
 }
 
+/*HTC_START*/
 static int32_t msm_camera_cci_i2c_set_mask(struct msm_camera_i2c_client *client,
 	uint32_t addr, uint16_t mask,
 	enum msm_camera_i2c_data_type data_type, uint16_t set_mask);
-
+/*HTC_END*/
 int32_t msm_camera_cci_i2c_write_table(
 	struct msm_camera_i2c_client *client,
 	struct msm_camera_i2c_reg_setting *write_setting)
 {
 	int32_t rc = -EFAULT;
 	struct msm_camera_cci_ctrl cci_ctrl;
+    //HTC_START TODO : OLD_SYTLE FIXME
 
 	int i;
 	struct msm_camera_i2c_reg_array *reg_setting;
 	uint16_t client_addr_type;
-
-	// HTC: fix the delay sensor setting for OV4688 when the address is 0xffff and the data is delay time.
+	//HTC_END
+	//HTC_START, fix the delay sensor setting for OV4688 when the address is 0xffff and the data is delay time.
 	int special_delay = 0;
+	//HTC_END
 	if (!client || !write_setting)
 		return rc;
 
-	// HTC: fix the delay sensor setting for OV4688 when the address is 0xffff and the data is delay time.
+	//HTC_START, fix the delay sensor setting for OV4688 when the address is 0xffff and the data is delay time.
 	reg_setting = write_setting->reg_setting;
-	for (i = 0; i < write_setting->size; i++) {
-		if (reg_setting->reg_addr == 0xffff) {
-			special_delay = 1;
-			break;
+	for (i = 0; i < write_setting->size; i++)
+	{
+		if (reg_setting->reg_addr == 0xffff)
+		{
+		    special_delay = 1;
+		    break;
 		}
 		reg_setting++;
 	}
+	//HTC_END
+/*HTC_START*/
 	if ((write_setting->addr_type != MSM_CAMERA_I2C_BYTE_ADDR
 		&& write_setting->addr_type != MSM_CAMERA_I2C_WORD_ADDR)
 		|| (write_setting->data_type != MSM_CAMERA_I2C_BYTE_DATA
@@ -265,41 +249,53 @@ int32_t msm_camera_cci_i2c_write_table(
 			reg_setting++;
 		}
 	} else {
-		// HTC: fix the delay sensor setting for OV4688 when the address is 0xffff and the data is delay time.
-		if (special_delay == 0) {
-			cci_ctrl.cmd = MSM_CCI_I2C_WRITE;
-			cci_ctrl.cci_info = client->cci_client;
-			cci_ctrl.cfg.cci_i2c_write_cfg.reg_setting =
-				write_setting->reg_setting;
-			cci_ctrl.cfg.cci_i2c_write_cfg.data_type = write_setting->data_type;
-			cci_ctrl.cfg.cci_i2c_write_cfg.addr_type = client->addr_type;
-			cci_ctrl.cfg.cci_i2c_write_cfg.size = write_setting->size;
-			rc = v4l2_subdev_call(client->cci_client->cci_subdev,
-					core, ioctl, VIDIOC_MSM_CCI_CFG, &cci_ctrl);
-			if (rc < 0) {
-				pr_err("%s: line %d rc = %d\n", __func__, __LINE__, rc);
-				return rc;
-			}
-			rc = cci_ctrl.status;
-		} else {
-			for (i = 0; i < write_setting->size; i++) {
-				if (reg_setting->reg_addr == 0xffff) {
-					int delay = reg_setting->reg_data;
-					msleep(delay);
-					pr_info("%s: delay %d ms\n", __func__,delay);
-				} else {
-					//pr_info("%04x %04x\n", reg_setting->reg_addr, reg_setting->reg_data);
-					rc = msm_camera_cci_i2c_write(client, reg_setting->reg_addr,
-					reg_setting->reg_data, write_setting->data_type);
-					if (rc < 0) {
-						pr_err("%s: write addr(0x%x) data:0x%x fail\n", __func__,reg_setting->reg_addr, reg_setting->reg_data);
-						return rc;
-					}
-				}
-				reg_setting++;
+		//HTC_START, fix the delay sensor setting for OV4688 when the address is 0xffff and the data is delay time.
+		if(special_delay == 0)
+		{
+		//HTC_END
+		cci_ctrl.cmd = MSM_CCI_I2C_WRITE;
+		cci_ctrl.cci_info = client->cci_client;
+		cci_ctrl.cfg.cci_i2c_write_cfg.reg_setting =
+			write_setting->reg_setting;
+		cci_ctrl.cfg.cci_i2c_write_cfg.data_type = write_setting->data_type;
+		cci_ctrl.cfg.cci_i2c_write_cfg.addr_type = client->addr_type;
+		cci_ctrl.cfg.cci_i2c_write_cfg.size = write_setting->size;
+		rc = v4l2_subdev_call(client->cci_client->cci_subdev,
+				core, ioctl, VIDIOC_MSM_CCI_CFG, &cci_ctrl);
+		if (rc < 0) {
+			pr_err("%s: line %d rc = %d\n", __func__, __LINE__, rc);
+			return rc;
+		}
+		rc = cci_ctrl.status;
+		//HTC_START, fix the delay sensor setting for OV4688 when the address is 0xffff and the data is delay time.
+		}
+		else
+		{
+			for (i = 0; i < write_setting->size; i++)
+			{
+			    if (reg_setting->reg_addr == 0xffff)
+			    {
+			        int delay = reg_setting->reg_data;
+			        msleep(delay);
+			        pr_info("%s: delay %d ms\n", __func__,delay);
+			    }
+			    else
+			    {
+				//pr_info("%04x %04x\n", reg_setting->reg_addr, reg_setting->reg_data);
+			        rc = msm_camera_cci_i2c_write(client, reg_setting->reg_addr,
+			        reg_setting->reg_data, write_setting->data_type);
+			        if (rc < 0)
+			        {
+			            pr_err("%s: write addr(0x%x) data:0x%x fail\n", __func__,reg_setting->reg_addr, reg_setting->reg_data);
+			            return rc;
+			        }
+			    }
+			    reg_setting++;
 			}
 		}
+		//HTC_END
 	}
+/*HTC_END*/
 	if (write_setting->delay > 20)
 		msleep(write_setting->delay);
 	else if (write_setting->delay)
@@ -331,12 +327,6 @@ int32_t msm_camera_cci_i2c_write_seq_table(
 	reg_setting = write_setting->reg_setting;
 	client_addr_type = client->addr_type;
 	client->addr_type = write_setting->addr_type;
-
-	if (reg_setting->reg_data_size > I2C_SEQ_REG_DATA_MAX) {
-		pr_err("%s: number of bytes %u exceeding the max supported %d\n",
-		__func__, reg_setting->reg_data_size, I2C_SEQ_REG_DATA_MAX);
-		return rc;
-	}
 
 	for (i = 0; i < write_setting->size; i++) {
 		rc = msm_camera_cci_i2c_write_seq(client, reg_setting->reg_addr,
@@ -463,6 +453,7 @@ int32_t msm_camera_cci_i2c_poll(struct msm_camera_i2c_client *client,
 	return rc;
 }
 
+/*HTC_START*/
 int32_t msm_camera_cci_i2c_poll_table(
 	struct msm_camera_i2c_client *client,
 	struct msm_camera_i2c_reg_setting *poll_setting)
@@ -494,6 +485,7 @@ int32_t msm_camera_cci_i2c_poll_table(
 	client->addr_type = client_addr_type;
 	return rc;
 }
+/*HTC_END*/
 
 static int32_t msm_camera_cci_i2c_set_mask(struct msm_camera_i2c_client *client,
 	uint32_t addr, uint16_t mask,
